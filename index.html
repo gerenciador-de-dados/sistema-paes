@@ -1,0 +1,207 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sistema Paes - Jogos de Hoje</title>
+  <style>
+    body {
+      background-color: #e5e5e5;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      color: #111;
+    }
+    header {
+      background-color: #d60000;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    nav {
+      background: #ccc;
+      padding: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+    nav button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      background: #d60000;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .refresh {
+      text-align: center;
+      margin: 10px;
+    }
+    .content {
+      padding: 20px;
+      max-width: 1000px;
+      margin: auto;
+    }
+    .jogo {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.05);
+    }
+    .jogo h3 {
+      margin-top: 0;
+    }
+    .favorito {
+      color: gold;
+      font-size: 18px;
+      float: right;
+    }
+    .status {
+      font-weight: bold;
+      margin-top: 5px;
+    }
+    .estatisticas {
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    .contador {
+      text-align: center;
+      font-weight: bold;
+      margin: 10px auto;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sistema Paes - Jogos Reais do Dia</h1>
+  </header>
+
+  <nav>
+    <button onclick="filtrar('todos')">Todos</button>
+    <button onclick="filtrar('futebol')">⚽ Futebol</button>
+    <button onclick="filtrar('basquete')">🏀 Basquete</button>
+    <button onclick="filtrar('tenis')">🎾 Tênis</button>
+    <button onclick="filtrar('ao-vivo')">⏱️ Ao Vivo</button>
+    <button onclick="filtrar('favorito')">⭐ Favoritos</button>
+  </nav>
+
+  <div class="refresh">
+    <button onclick="carregarJogos()">🔄 Atualizar Jogos</button>
+  </div>
+
+  <div class="contador" id="contador">Carregando jogos...</div>
+  <div class="content" id="jogos"></div>
+
+  <script>
+    function filtrar(classe) {
+      document.querySelectorAll('.jogo').forEach(el => {
+        el.style.display = (classe === 'todos' || el.classList.contains(classe)) ? 'block' : 'none';
+      });
+    }
+
+    async function carregarJogos() {
+      const container = document.getElementById('jogos');
+      const contador = document.getElementById('contador');
+      container.innerHTML = "";
+      contador.innerText = "🔄 Buscando jogos...";
+      const hoje = new Date();
+      const offset = hoje.getTimezoneOffset() * 60000;
+      const brasilData = new Date(hoje.getTime() - offset).toISOString().split("T")[0];
+
+      const url = `https://v3.football.api-sports.io/fixtures?date=${brasilData}`;
+      const resposta = await fetch(url, {
+        headers: { "x-apisports-key": "55e6c8cb2073904dabfe7269d2d4cc20" }
+      });
+
+      const data = await resposta.json();
+      let jogos = data.response;
+
+      if (!jogos || jogos.length === 0) {
+        contador.innerText = "Nenhum jogo encontrado para hoje.";
+        container.innerHTML = `
+          <div class="jogo">
+            <h3>Exemplo: Flamengo x Palmeiras <span class="favorito">★</span></h3>
+            <div class="status">AO VIVO</div>
+            <div class="status">Liga: Brasileirão</div>
+          </div>`;
+        return;
+      }
+
+      // Ordenar por horário do jogo
+      jogos.sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
+
+      contador.innerText = `Jogos carregados: ${jogos.length}`;
+
+      for (const jogo of jogos) {
+        const liga = jogo.league.name;
+        const timeCasa = jogo.teams.home.name;
+        const timeFora = jogo.teams.away.name;
+        const horario = jogo.fixture.date.split("T")[1].substring(0, 5);
+        const status = jogo.fixture.status.short;
+        const statusTexto = status === "NS" ? `Hoje às ${horario}` :
+                            ["1H", "2H", "LIVE"].includes(status) ? "AO VIVO" :
+                            status === "FT" ? "Finalizado" : status;
+
+        const isFavorito = timeCasa.toLowerCase().includes("flamengo") || timeFora.toLowerCase().includes("flamengo");
+        const idJogo = jogo.fixture.id;
+
+        let estatisticasHTML = "<div class='estatisticas'>🔄 Carregando estatísticas...</div>";
+        try {
+          const statsResp = await fetch(`https://v3.football.api-sports.io/fixtures/statistics?fixture=${idJogo}`, {
+            headers: { "x-apisports-key": "55e6c8cb2073904dabfe7269d2d4cc20" }
+          });
+          const statsData = await statsResp.json();
+          const estatisticas = statsData.response;
+
+          if (estatisticas.length >= 2) {
+            const casaStats = estatisticas[0].statistics;
+            const foraStats = estatisticas[1].statistics;
+
+            const getStat = (arr, tipo) => {
+              const stat = arr.find(s => s.type === tipo);
+              return stat ? stat.value : "–";
+            };
+
+            estatisticasHTML = `
+              <div class="estatisticas">
+                <b>${timeCasa}</b> ⚽
+                Gols Esperados: ${getStat(casaStats, "Expected Goals")} | 
+                Chutes: ${getStat(casaStats, "Shots on Goal")} | 
+                Defesas: ${getStat(casaStats, "Goalkeeper Saves")} | 
+                Escanteios: ${getStat(casaStats, "Corner Kicks")} | 
+                Cartões: ${getStat(casaStats, "Yellow Cards")}<br><br>
+                <b>${timeFora}</b> ⚽
+                Gols Esperados: ${getStat(foraStats, "Expected Goals")} | 
+                Chutes: ${getStat(foraStats, "Shots on Goal")} | 
+                Defesas: ${getStat(foraStats, "Goalkeeper Saves")} | 
+                Escanteios: ${getStat(foraStats, "Corner Kicks")} | 
+                Cartões: ${getStat(foraStats, "Yellow Cards")}
+              </div>
+            `;
+          } else {
+            estatisticasHTML = "<div class='estatisticas'>Sem estatísticas disponíveis</div>";
+          }
+        } catch (erro) {
+          estatisticasHTML = "<div class='estatisticas'>Erro ao carregar estatísticas</div>";
+        }
+
+        container.innerHTML += `
+          <div class="jogo futebol ${statusTexto.includes('AO VIVO') ? 'ao-vivo' : ''} ${isFavorito ? 'favorito' : ''}">
+            <h3>${timeCasa} x ${timeFora} ${isFavorito ? '<span class="favorito">★</span>' : ''}</h3>
+            <div class="status">Status: ${statusTexto}</div>
+            <div class="status">Liga: ${liga} | Horário: ${horario}</div>
+            ${estatisticasHTML}
+          </div>
+        `;
+      }
+    }
+
+    carregarJogos();
+  </script>
+</body>
+</html>
