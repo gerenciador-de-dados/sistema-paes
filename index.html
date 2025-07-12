@@ -1,0 +1,77 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sistema Paes - Jogos de Hoje</title>
+  <style>
+    body { background: #f2f2f2; font-family: Arial, sans-serif; margin: 0; color: #111; }
+    header { background: #d60000; color: #fff; text-align: center; padding: 20px; }
+    nav, .refresh { background: #eee; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding: 10px; }
+    button { background: #d60000; color: #fff; font-weight: bold; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+    .content { padding: 20px; max-width: 800px; margin: auto; }
+    .jogo { background: #fff; border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
+    .jogo h3 { margin: 0 0 5px; }
+    .favorito { color: gold; font-size: 18px; float: right; }
+    .status { font-weight: bold; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sistema Paes - Jogos Reais do Dia</h1>
+  </header>
+
+  <div class="refresh">
+    <button onclick="carregarJogos()">🔄 Atualizar Jogos</button>
+  </div>
+
+  <div class="content" id="jogos">Carregando jogos...</div>
+
+  <script>
+    async function carregarJogos() {
+      const container = document.getElementById('jogos');
+      container.innerHTML = '🔄 Buscando jogos...';
+
+      const hoje = new Date().toISOString().split("T")[0];
+      const url = `https://v3.football.api-sports.io/fixtures?date=${hoje}`;
+      const resposta = await fetch(url, {
+        headers: { "x-apisports-key": "55e6c8cb2073904dabfe7269d2d4cc20" }
+      });
+
+      const data = await resposta.json();
+      const jogos = data.response;
+
+      if (!jogos.length) {
+        container.innerHTML = "Nenhum jogo encontrado para hoje.";
+        return;
+      }
+
+      container.innerHTML = "";
+
+      jogos.forEach(jogo => {
+        const liga = jogo.league.name;
+        const timeCasa = jogo.teams.home.name;
+        const timeFora = jogo.teams.away.name;
+        const horario = jogo.fixture.date.split("T")[1].substring(0,5);
+        const status = jogo.fixture.status.short;
+        const statusTexto = status === "NS" ? `Hoje às ${horario}` :
+                            status === "1H" || status === "2H" || status === "LIVE" ? "AO VIVO" :
+                            status === "FT" ? "Finalizado" : status;
+
+        const isFavorito = timeCasa.toLowerCase().includes("flamengo") || timeFora.toLowerCase().includes("flamengo");
+
+        container.innerHTML += `
+          <div class="jogo">
+            <h3>${timeCasa} x ${timeFora}
+              ${isFavorito ? '<span class="favorito">★</span>' : ''}
+            </h3>
+            <div class="status">Status: ${statusTexto}</div>
+            <div class="status">Liga: ${liga}</div>
+          </div>
+        `;
+      });
+    }
+
+    carregarJogos();
+  </script>
+</body>
+</html>
